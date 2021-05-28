@@ -1,0 +1,17 @@
+
+{
+    "projectName": "investigations::uk-coronavirus-data-alerts",
+    "vcsURL": "https://github.com/guardian/uk-coronavirus-data-alerts",
+    "actions": [
+        {
+            "action": "cloudformation",
+            "path": "dist/cloudformation.yaml",
+            "compress": false
+        },
+        {
+            "action": "uk-coronavirus-data-alerts",
+            "path": "dist/lambda",
+            "compress": "zip"
+        }
+    ]
+}

@@ -1,0 +1,18 @@
+stacks: [pfi-structured]
+regions: [eu-west-1]
+
+deployments:
+  cloudformation:
+    type: cloud-formation
+    app: uk-coronavirus-data-alerts
+    parameters:
+      templatePath: cloudformation.yaml
+      createStackIfAbsent: false
+
+  uk-coronavirus-data-alerts:
+    type: aws-lambda
+    dependencies: [cloudformation]
+    parameters:
+      fileName: uk-coronavirus-data-alerts.zip
+      bucketSsmLookup: true
+      lookupByTags: true
