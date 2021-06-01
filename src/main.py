@@ -49,18 +49,7 @@ def save_metric_definitions(metric_names):
     s3_client.put_object(Body=body, Bucket = METRICS_BUCKET, Key = METRICS_KEY)
     print(f"Done", file=sys.stderr)
 
-def get_average_hospital_admissions_by_region():
-    """
-                        areaName  averageAdmissionsLastWeek  averageAdmissionsWeekBefore  percentageChange
-    0                    London                  12.571429                    13.857143         90.721649
-    1                South East                   6.571429                     8.142857         80.701754
-    2                South West                   6.142857                     5.142857        119.444444
-    3           East of England                   8.285714                    10.714286         77.333333
-    4                  Midlands                  18.571429                    21.857143         84.967320
-    5  North East and Yorkshire                  17.571429                    19.285714         91.111111
-    6                North West                  14.714286                    13.428571        109.574468
-    """
-    url = "https://api.coronavirus.data.gov.uk/v2/data?areaType=nhsRegion&metric=newAdmissions&format=csv"
+def get_percentage_change(url, metric_name):
     df = pd.read_csv(url)
 
     df['date'] = pd.to_datetime(df['date'])
@@ -82,22 +71,33 @@ def get_average_hospital_admissions_by_region():
         area_data_last_week = area_data[area_data.date.ge(six_days_before)]
         area_data_week_before_last = area_data[area_data.date.ge(thirteen_days_before) & area_data.date.le(seven_days_before)]
 
-        average_admissions_last_week = area_data_last_week['newAdmissions'].mean()
-        average_admissions_week_before = area_data_week_before_last['newAdmissions'].mean()
+        average_last_week = area_data_last_week[metric_name].mean()
+        average_week_before = area_data_week_before_last[metric_name].mean()
 
-        percentage_change = ((average_admissions_last_week - average_admissions_week_before) / average_admissions_week_before) * 100.0
+        percentage_change = ((average_last_week - average_week_before) / average_week_before) * 100.0
 
-        ret.append([area_name, average_admissions_week_before, average_admissions_last_week, percentage_change])
+        ret.append([area_name, average_week_before, average_last_week, percentage_change])
 
     column_names = [
         'areaName',
-        f'averageAdmissions-{thirteen_days_before.strftime("%m-%d-%Y")}-to-{seven_days_before.strftime("%m-%d-%Y")}',
-        f'averageAdmissions-{six_days_before.strftime("%m-%d-%Y")}-to-{latest.strftime("%m-%d-%Y")}',        
+        f'{metric_name}-{thirteen_days_before.strftime("%m-%d-%Y")}-to-{seven_days_before.strftime("%m-%d-%Y")}',
+        f'{metric_name}-{six_days_before.strftime("%m-%d-%Y")}-to-{latest.strftime("%m-%d-%Y")}',
         'percentageChange'
     ]
 
     ret_df = pd.DataFrame(ret, columns = column_names)
     return ret_df
+
+def get_areas_above_threshold(area_type, metric_name, threshold):
+    url = f"https://api.coronavirus.data.gov.uk/v2/data?areaType={area_type}&metric={metric_name}&format=csv"
+    df = get_percentage_change(url, metric_name)
+
+    print(f"{metric_name} data:", file=sys.stderr)
+    print(df.to_string(), file=sys.stderr)
+
+    df = df[df.percentageChange.gt(threshold)].sort_values("percentageChange", ascending=False)
+
+    return df
 
 def send_notification_email(subject, body):
     print(f"Email {', '.join(NOTIFY_EMAILS)}. Subject: {subject}. Body: {body}", file=sys.stderr)
@@ -153,30 +153,31 @@ def compare_available_metrics():
 
     save_metric_definitions(current)
 
-def check_hospital_admissions():
-    df = get_average_hospital_admissions_by_region()
-    print("All regions:", file=sys.stderr)
-    print(df, file=sys.stderr)
-
+def check_last_two_weeks_of_metrics():
     # TODO MRB: put threshold back
     # threshold = 125.0
     threshold = 1.0
 
-    to_alert = df[df.percentageChange.gt(threshold)].sort_values("percentageChange", ascending=False)
+    all_data = [
+        get_areas_above_threshold("nhsRegion", "newAdmissions", threshold),
+        get_areas_above_threshold("ltla", "newCasesBySpecimenDate", threshold)
+    ]
+
+    to_alert = [f"<p>{df.to_html()}</p>" for df in all_data if len(df) > 0]
 
     if len(to_alert) > 0:
         body = textwrap.dedent(f"""
-            <p>Some regions have exceeded {threshold}% change week on week for hospital admissions:</p>
-            <p>{to_alert.to_html()}</p>
+            <p>Some metrics have exceeded {threshold}% change week on week:</p>
+            {"".join(to_alert)}
             <p>Check https://coronavirus.data.gov.uk/</p>
         """)
-        send_notification_email("[UK Coronavirus Data Alert] Hospital admissions alert", body)
+        send_notification_email("UK Coronavirus Data Alert", body)
     else:
-        print(f"No region exceeded percentage change threshold {threshold}%", file=sys.stderr)
+        print(f"No metric exceeded {threshold}% change", file=sys.stderr)
 
 def lambda_handler(event, lambda_context):
     compare_available_metrics()
-    check_hospital_admissions()
+    check_last_two_weeks_of_metrics()
 
 if __name__ == "__main__":
     lambda_handler(None, None)
