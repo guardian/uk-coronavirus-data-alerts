@@ -1,4 +1,4 @@
-import { App, Fn, Arn } from "@aws-cdk/core";
+import { App, Fn, Arn, CfnParameter } from "@aws-cdk/core";
 import { Runtime } from "@aws-cdk/aws-lambda";
 import { Schedule } from "@aws-cdk/aws-events";
 import { PolicyStatement } from "@aws-cdk/aws-iam";
@@ -12,11 +12,19 @@ class UKCoronavirusDataAlertsStack extends GuStack {
 
         const app = 'uk-coronavirus-data-alerts';
 
+        // Pass these as a parameter to avoid putting email addresses in the open
+        const notifyEmailAddresses = new CfnParameter(this, 'NotifyEmailAddresses', {
+            description: 'Comma-separated list of email addresses to notify'
+        });
+
         const lambda = new GuScheduledLambda(this, 'Lambda', {
             app,
             runtime: Runtime.PYTHON_3_8,
             handler: 'main.lambda_handler',
             fileName: `${app}.zip`,
+            environment: {
+                'NOTIFY_EMAIL_ADDRESSES': notifyEmailAddresses.valueAsString
+            },
             monitoringConfiguration: {
                 toleratedErrorPercentage: 0,
                 snsTopicName: Fn.importValue('AlertSNSTopic-PROD')

@@ -7,15 +7,18 @@ import pandas as pd
 import requests
 import textwrap
 
-SITE_BASE = "https://coronavirus.data.gov.uk"
-V1_API_BASE = SITE_BASE + "/api/v1"
-V2_API_BASE = SITE_BASE + "/api/v2"
-
 AWS_REGION = "eu-west-1"
 METRICS_BUCKET = "investigations-data-dev"
 METRICS_KEY = "uk-coronavirus-data-alerts/metrics.json"
 
-NOTIFY_EMAILS = ["michael.barton@guardian.co.uk"]
+PERCENTAGE_CHANGE_THRESHOLD = 125.0
+
+NOTIFY_EMAILS = os.environ.get("NOTIFY_EMAIL_ADDRESSES")
+if NOTIFY_EMAILS is None:
+    NOTIFY_EMAILS = []
+else:
+    NOTIFY_EMAILS = [email.strip() for email in NOTIFY_EMAILS.split(",")]
+
 
 if "AWS_EXECUTION_ENV" in os.environ:
     # Use the default credentials chain when running in AWS
@@ -27,7 +30,7 @@ s3_client = boto_session.client("s3", region_name = AWS_REGION)
 ses_client = boto_session.client("ses", region_name = AWS_REGION)
 
 def get_current_metric_definitions():
-    url = SITE_BASE + "/public/assets/dispatch/api_variables.json"
+    url = "https://coronavirus.data.gov.uk/public/assets/dispatch/api_variables.json"
 
     sys.stderr.write(f"GET {url}... ")
     resp = requests.get(url).json()
@@ -100,26 +103,30 @@ def get_areas_above_threshold(area_type, metric_name, threshold):
     return df
 
 def send_notification_email(subject, body):
-    print(f"Email {', '.join(NOTIFY_EMAILS)}. Subject: {subject}. Body: {body}", file=sys.stderr)
+    if len(NOTIFY_EMAILS) == 0:
+        print(f"No email addresses configured. Not sending an email but if I did it would look like this:", file=sys.stderr)
+        print(f"Subject: {subject}. Body: {body}", file=sys.stderr)
+    else:
+        print(f"Email {', '.join(NOTIFY_EMAILS)}. Subject: {subject}. Body: {body}", file=sys.stderr)
 
-    ses_client.send_email(
-        Source = "investigations.and.reporting@theguardian.com",
-        Destination = {
-            "ToAddresses": NOTIFY_EMAILS
-        },
-        Message = {
-            "Subject": {
-                "Data": subject
+        ses_client.send_email(
+            Source = "investigations.and.reporting@theguardian.com",
+            Destination = {
+                "ToAddresses": NOTIFY_EMAILS
             },
-            "Body": {
-                "Html": {
-                    "Data": body
+            Message = {
+                "Subject": {
+                    "Data": subject
+                },
+                "Body": {
+                    "Html": {
+                        "Data": body
+                    }
                 }
             }
-        }
-    )
+        )
 
-    print(f"Email sent succesfully", file=sys.stderr)
+        print(f"Email sent succesfully", file=sys.stderr)
 
 def compare_available_metrics():
     current = get_current_metric_definitions()
@@ -154,9 +161,7 @@ def compare_available_metrics():
     save_metric_definitions(current)
 
 def check_last_two_weeks_of_metrics():
-    # TODO MRB: put threshold back
-    # threshold = 125.0
-    threshold = 1.0
+    threshold = PERCENTAGE_CHANGE_THRESHOLD
 
     all_data = [
         get_areas_above_threshold("nhsRegion", "newAdmissions", threshold),

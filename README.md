@@ -1,6 +1,6 @@
 # UK Coronavirus Data Alerts
 
-## Running locally
+## Running locally
 
 This project uses Python 3. See the [Hitchhiker's Guide to Python](https://docs.python-guide.org/starting/installation/) for options on how to install it.
 
