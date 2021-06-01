@@ -160,7 +160,8 @@ def check_last_two_weeks_of_metrics():
 
     all_data = [
         get_areas_above_threshold("nhsRegion", "newAdmissions", threshold),
-        get_areas_above_threshold("ltla", "newCasesBySpecimenDate", threshold)
+        get_areas_above_threshold("ltla", "newCasesBySpecimenDate", threshold),
+        get_areas_above_threshold("nhsRegion", "hospitalCases", threshold)
     ]
 
     to_alert = [f"<p>{df.to_html()}</p>" for df in all_data if len(df) > 0]
