@@ -52,7 +52,7 @@ def save_metric_definitions(metric_names):
     s3_client.put_object(Body=body, Bucket = METRICS_BUCKET, Key = METRICS_KEY)
     print(f"Done", file=sys.stderr)
 
-def get_percentage_change(url, metric_name):
+def get_percentage_change(url, metric_name, aggregationFunction):
     df = pd.read_csv(url)
 
     df['date'] = pd.to_datetime(df['date'])
@@ -74,12 +74,12 @@ def get_percentage_change(url, metric_name):
         area_data_last_week = area_data[area_data.date.ge(six_days_before)]
         area_data_week_before_last = area_data[area_data.date.ge(thirteen_days_before) & area_data.date.le(seven_days_before)]
 
-        average_last_week = area_data_last_week[metric_name].mean()
-        average_week_before = area_data_week_before_last[metric_name].mean()
+        aggregation_output_last_week = getattr(area_data_last_week[metric_name], aggregationFunction)()
+        aggregation_output_week_before = getattr(area_data_week_before_last[metric_name], aggregationFunction)()
 
-        percentage_change = ((average_last_week - average_week_before) / average_week_before) * 100.0
+        percentage_change = ((aggregation_output_last_week - aggregation_output_week_before) / aggregation_output_week_before) * 100.0
 
-        ret.append([area_name, average_week_before, average_last_week, percentage_change])
+        ret.append([area_name, aggregation_output_week_before, aggregation_output_last_week, percentage_change])
 
     column_names = [
         'areaName',
@@ -91,9 +91,9 @@ def get_percentage_change(url, metric_name):
     ret_df = pd.DataFrame(ret, columns = column_names)
     return ret_df
 
-def get_areas_above_threshold(area_type, metric_name, threshold):
+def get_areas_above_threshold(area_type, metric_name, threshold, aggregationFunction):
     url = f"https://api.coronavirus.data.gov.uk/v2/data?areaType={area_type}&metric={metric_name}&format=csv"
-    df = get_percentage_change(url, metric_name)
+    df = get_percentage_change(url, metric_name, aggregationFunction)
 
     print(f"{metric_name} data:", file=sys.stderr)
     print(df.to_string(), file=sys.stderr)
@@ -164,9 +164,9 @@ def check_last_two_weeks_of_metrics():
     threshold = PERCENTAGE_CHANGE_THRESHOLD
 
     all_data = [
-        get_areas_above_threshold("nhsRegion", "newAdmissions", threshold),
-        get_areas_above_threshold("ltla", "newCasesBySpecimenDate", threshold),
-        get_areas_above_threshold("nhsRegion", "hospitalCases", threshold)
+        get_areas_above_threshold("nhsRegion", "newAdmissions", threshold, 'mean'),
+        get_areas_above_threshold("ltla", "newCasesBySpecimenDate", threshold, 'sum'),
+        get_areas_above_threshold("nhsRegion", "hospitalCases", threshold, 'mean')
     ]
 
     to_alert = [f"<p>{df.to_html()}</p>" for df in all_data if len(df) > 0]
