@@ -26,10 +26,10 @@ if "AWS_EXECUTION_ENV" in os.environ:
     # Use the default credentials chain when running in AWS
     boto_session = boto3.session.Session()
 else:
-    boto_session = boto3.session.Session(profile_name="investigations")
+    boto_session = boto3.session.Session(profile_name = "investigations")
 
-s3_client = boto_session.client("s3", region_name=AWS_REGION)
-ses_client = boto_session.client("ses", region_name=AWS_REGION)
+s3_client = boto_session.client("s3", region_name = AWS_REGION)
+ses_client = boto_session.client("ses", region_name = AWS_REGION)
 
 
 def get_current_metric_definitions():
@@ -44,7 +44,7 @@ def get_current_metric_definitions():
 
 def get_previous_metric_definitions():
     sys.stderr.write(f"Downloading metrics from s3://${METRICS_BUCKET}/{METRICS_KEY}... ")
-    response = s3_client.get_object(Bucket=METRICS_BUCKET, Key=METRICS_KEY)
+    response = s3_client.get_object(Bucket = METRICS_BUCKET, Key = METRICS_KEY)
     print(f"Done", file=sys.stderr)
 
     return json.load(response['Body'])
@@ -54,7 +54,7 @@ def save_metric_definitions(metric_names):
     body = json.dumps(metric_names)
 
     sys.stderr.write(f"Uploading metrics to s3://${METRICS_BUCKET}/${METRICS_KEY}... ")
-    s3_client.put_object(Body=body, Bucket=METRICS_BUCKET, Key=METRICS_KEY)
+    s3_client.put_object(Body = body, Bucket = METRICS_BUCKET, Key = METRICS_KEY)
     print(f"Done", file=sys.stderr)
 
 
@@ -101,8 +101,7 @@ def get_stats(url, metric_name, aggregation_function):
         thirteen_days_before = latest - pd.Timedelta(days=13)
 
         area_data_last_week = area_data[area_data.date.ge(six_days_before)]
-        area_data_week_before_last = area_data[
-            area_data.date.ge(thirteen_days_before) & area_data.date.le(seven_days_before)]
+        area_data_week_before_last = area_data[area_data.date.ge(thirteen_days_before) & area_data.date.le(seven_days_before)]
 
         aggregation_output_last_week = getattr(area_data_last_week[metric_name], aggregation_function)()
         aggregation_output_week_before = getattr(area_data_week_before_last[metric_name], aggregation_function)()
@@ -127,7 +126,7 @@ def get_stats(url, metric_name, aggregation_function):
         'percentageChange',
     ]
 
-    ret_df = pd.DataFrame(ret, columns=column_names)
+    ret_df = pd.DataFrame(ret, columns = column_names)
     return ret_df
 
 
@@ -148,18 +147,17 @@ def get_areas_above_thresholds(area_type, metric_name, percentage_change_thresho
 
 def send_notification_email(subject, body):
     if len(NOTIFY_EMAILS) == 0:
-        print(f"No email addresses configured. Not sending an email but if I did it would look like this:",
-              file=sys.stderr)
+        print(f"No email addresses configured. Not sending an email but if I did it would look like this:", file=sys.stderr)
         print(f"Subject: {subject}. Body: {body}", file=sys.stderr)
     else:
         print(f"Email {', '.join(NOTIFY_EMAILS)}. Subject: {subject}. Body: {body}", file=sys.stderr)
 
         ses_client.send_email(
-            Source="investigations.and.reporting@theguardian.com",
-            Destination={
+            Source = "investigations.and.reporting@theguardian.com",
+            Destination = {
                 "ToAddresses": NOTIFY_EMAILS
             },
-            Message={
+            Message = {
                 "Subject": {
                     "Data": subject
                 },
@@ -173,10 +171,11 @@ def send_notification_email(subject, body):
 
         print(f"Email sent succesfully", file=sys.stderr)
 
+
 def compare_available_metrics():
     current = get_current_metric_definitions()
     previous = {}
-    
+
     try:
         previous = get_previous_metric_definitions()
     except Exception as e:
