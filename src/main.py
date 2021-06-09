@@ -13,8 +13,6 @@ METRICS_KEY = "uk-coronavirus-data-alerts/metrics.json"
 
 PERCENTAGE_CHANGE_THRESHOLD = 100.0
 CASES_PER_100000_POPULATION_THRESHOLD = 50.0
-HOSPITAL_CASES_PER_100000_POPULATION_THRESHOLD = 0.0
-ADMISSIONS_PER_100000_POPULATION_THRESHOLD = 0.0
 
 NOTIFY_EMAILS = os.environ.get("NOTIFY_EMAIL_ADDRESSES")
 if NOTIFY_EMAILS is None:
@@ -76,73 +74,111 @@ def population_for_area(populations_df, area_name, area_code):
         print(f"Error getting population for area '{area_name}', area code {area_code} not found.", file=sys.stderr)
 
 
-def get_metric_value_per_100000(metric_value, area_name, area_code):
-    populations_df = get_populations()
+def metric_value_per_100000(populations_df, metric_value, area_name, area_code):
     area_population = population_for_area(populations_df, area_name, area_code)
     return (metric_value / area_population) * 100000
 
 
-def get_stats(url, metric_name, aggregation_function):
+def get_percentage_change(area_name, metric_name, metric_df, aggregation_function):
+    area_data = metric_df[metric_df.areaName.eq(area_name)]
+
+    latest = metric_df['date'].max()
+
+    # We want 7 days inclusive of the latest
+    six_days_before = latest - pd.Timedelta(days=6)
+    seven_days_before = latest - pd.Timedelta(days=7)
+    # As above
+    thirteen_days_before = latest - pd.Timedelta(days=13)
+
+    area_data_last_week = area_data[area_data.date.ge(six_days_before)]
+    area_data_week_before_last = area_data[area_data.date.ge(thirteen_days_before) & area_data.date.le(seven_days_before)]
+
+    aggregation_output_last_week = getattr(area_data_last_week[metric_name], aggregation_function)()
+    aggregation_output_week_before = getattr(area_data_week_before_last[metric_name], aggregation_function)()
+
+    percentage_change = ((aggregation_output_last_week - aggregation_output_week_before) / aggregation_output_week_before) * 100.0
+    return {
+        "aggregation_output_week_before": {
+            "column_name": f'{metric_name}-{thirteen_days_before.strftime("%m-%d-%Y")}-to-{seven_days_before.strftime("%m-%d-%Y")}',
+            "value": aggregation_output_week_before
+        },
+        "aggregation_output_last_week": {
+            "column_name": f'{metric_name}-{six_days_before.strftime("%m-%d-%Y")}-to-{latest.strftime("%m-%d-%Y")}',
+            "value": aggregation_output_last_week
+        },
+        "percentage_change": {
+            "column_name": 'percentageChange',
+            "value": percentage_change
+        }
+    }
+
+def get_combined_stats(url, metric_name, aggregation_function):
     metric_df = pd.read_csv(url)
     metric_df['date'] = pd.to_datetime(metric_df['date'])
 
     area_names = metric_df.areaName.unique()
     ret = []
 
-    for area_name in area_names:
-        area_data = metric_df[metric_df.areaName.eq(area_name)]
+    if metric_name == "newCasesBySpecimenDate":
+        populations_df = get_populations()
+        for area_name in area_names:
+            percentage_change_stats = get_percentage_change(area_name, metric_name, metric_df, aggregation_function)
+            area_code = metric_df[metric_df.areaName.eq(area_name)].areaCode.unique()[0]
+            per_100000_population = metric_value_per_100000(populations_df, percentage_change_stats["aggregation_output_last_week"]["value"], area_name, area_code)
+            ret.append([
+                area_name,
+                percentage_change_stats["aggregation_output_week_before"]["value"],
+                percentage_change_stats["aggregation_output_last_week"]["value"],
+                per_100000_population,
+                percentage_change_stats["percentage_change"]["value"],
+            ])
+            column_names = [
+                'areaName',
+                percentage_change_stats["aggregation_output_week_before"]["column_name"],
+                percentage_change_stats["aggregation_output_last_week"]["column_name"],
+                'lastSevenDaysPer100000',
+                percentage_change_stats["percentage_change"]["column_name"],
+            ]
 
-        latest = metric_df['date'].max()
+            ret_df = pd.DataFrame(ret, columns = column_names)
+        return ret_df
+    else:
+        for area_name in area_names:
+            percentage_change_stats = get_percentage_change(area_name, metric_name, metric_df, aggregation_function)
+            ret.append([
+                area_name,
+                percentage_change_stats["aggregation_output_week_before"]["value"],
+                percentage_change_stats["aggregation_output_last_week"]["value"],
+                percentage_change_stats["percentage_change"]["value"],
+            ])
+            column_names = [
+                'areaName',
+                percentage_change_stats["aggregation_output_week_before"]["column_name"],
+                percentage_change_stats["aggregation_output_last_week"]["column_name"],
+                percentage_change_stats["percentage_change"]["column_name"],
+            ]
 
-        # We want 7 days inclusive of the latest
-        six_days_before = latest - pd.Timedelta(days=6)
-        seven_days_before = latest - pd.Timedelta(days=7)
-        # As above
-        thirteen_days_before = latest - pd.Timedelta(days=13)
-
-        area_data_last_week = area_data[area_data.date.ge(six_days_before)]
-        area_data_week_before_last = area_data[area_data.date.ge(thirteen_days_before) & area_data.date.le(seven_days_before)]
-
-        aggregation_output_last_week = getattr(area_data_last_week[metric_name], aggregation_function)()
-        aggregation_output_week_before = getattr(area_data_week_before_last[metric_name], aggregation_function)()
-
-        area_code = metric_df[metric_df.areaName.eq(area_name)].areaCode.unique()[0]
-        per_100000_population = get_metric_value_per_100000(aggregation_output_last_week, area_name, area_code)
-        percentage_change = ((aggregation_output_last_week - aggregation_output_week_before) / aggregation_output_week_before) * 100.0
-
-        ret.append([
-            area_name,
-            aggregation_output_week_before,
-            aggregation_output_last_week,
-            per_100000_population,
-            percentage_change,
-        ])
-
-    column_names = [
-        'areaName',
-        f'{metric_name}-{thirteen_days_before.strftime("%m-%d-%Y")}-to-{seven_days_before.strftime("%m-%d-%Y")}',
-        f'{metric_name}-{six_days_before.strftime("%m-%d-%Y")}-to-{latest.strftime("%m-%d-%Y")}',
-        f'lastSevenDaysPer100000',
-        'percentageChange',
-    ]
-
-    ret_df = pd.DataFrame(ret, columns = column_names)
-    return ret_df
+            ret_df = pd.DataFrame(ret, columns = column_names)
+        return ret_df
 
 
-def get_areas_above_thresholds(area_type, metric_name, percentage_change_threshold, metric_value_per_100000_threshold,
-                               aggregation_function):
+def get_areas_above_thresholds(area_type, metric_name, thresholds, aggregation_function):
     url = f"https://api.coronavirus.data.gov.uk/v2/data?areaType={area_type}&metric={metric_name}&format=csv"
-    df = get_stats(url, metric_name, aggregation_function)
+    df = get_combined_stats(url, metric_name, aggregation_function)
 
     print(f"{metric_name} data:", file=sys.stderr)
     print(df.to_string(), file=sys.stderr)
 
-    df = df[
-        df.percentageChange.gt(percentage_change_threshold) & df.lastSevenDaysPer100000.gt(metric_value_per_100000_threshold)
-        ].sort_values("percentageChange", ascending=False)
-
-    return df
+    if metric_name == "newCasesBySpecimenDate":
+        df = df[
+            df.percentageChange.gt(thresholds["percentage_change_threshold"]) & df.lastSevenDaysPer100000.gt(thresholds["metric_value_per_100000_threshold"])
+            ].sort_values("percentageChange", ascending=False)
+        return df
+    else:
+        df = df[
+            df.percentageChange.gt(thresholds["percentage_change_threshold"])
+            ].sort_values("percentageChange", ascending=False)
+        return df
 
 
 def send_notification_email(subject, body):
@@ -207,14 +243,15 @@ def compare_available_metrics():
 
 def check_last_two_weeks_of_metrics():
     percentage_change_threshold = PERCENTAGE_CHANGE_THRESHOLD
-    admissions_threshold = ADMISSIONS_PER_100000_POPULATION_THRESHOLD
     cases_threshold = CASES_PER_100000_POPULATION_THRESHOLD
-    hospital_cases_threshold = HOSPITAL_CASES_PER_100000_POPULATION_THRESHOLD
+
+    percentage_change_thresholds = {"percentage_change_threshold": percentage_change_threshold}
+    cases_thresholds = {"percentage_change_threshold": percentage_change_threshold, "metric_value_per_100000_threshold": cases_threshold}
 
     all_data = [
-        get_areas_above_thresholds("nhsRegion", "newAdmissions", percentage_change_threshold, admissions_threshold, 'mean'),
-        get_areas_above_thresholds("ltla", "newCasesBySpecimenDate", percentage_change_threshold, cases_threshold, 'sum'),
-        get_areas_above_thresholds("nhsRegion", "hospitalCases", percentage_change_threshold, hospital_cases_threshold, 'mean')
+        get_areas_above_thresholds("nhsRegion", "newAdmissions", percentage_change_thresholds, 'mean'),
+        get_areas_above_thresholds("ltla", "newCasesBySpecimenDate", cases_thresholds, 'sum'),
+        get_areas_above_thresholds("nhsRegion", "hospitalCases", percentage_change_thresholds, 'mean')
     ]
 
     to_alert = [f"<p>{df.to_html()}</p>" for df in all_data if len(df) > 0]
