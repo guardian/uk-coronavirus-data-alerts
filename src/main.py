@@ -76,8 +76,11 @@ def population_for_area(populations_df, area_name, area_code):
 
 def get_cases_per_100000(cases, populations_df, metric_df, area_name):
     area_code = area_code_for_area(metric_df, area_name)
-    area_population = population_for_area(populations_df, area_name, area_code)
-    return (cases / area_population) * 100000
+    try:
+        area_population = population_for_area(populations_df, area_name, area_code)
+        return (cases / area_population) * 100000
+    except TypeError:
+        print(f"Cannot calculate population for area ${area_name}", file=sys.stderr)
 
 
 # We want 7 days inclusive of the latest
@@ -110,8 +113,7 @@ def get_percentage_change(area_name, metric_name, metric_df, aggregation_functio
     aggregation_output_last_week = getattr(area_data_last_week[metric_name], aggregation_function)()
     aggregation_output_week_before = getattr(area_data_week_before_last[metric_name], aggregation_function)()
 
-    percentage_change = ((
-                                 aggregation_output_last_week - aggregation_output_week_before) / aggregation_output_week_before) * 100.0
+    percentage_change = ((aggregation_output_last_week - aggregation_output_week_before) / aggregation_output_week_before) * 100.0
 
     return {
         "aggregation_output_week_before": aggregation_output_week_before,
@@ -126,23 +128,24 @@ def percentage_changes(url, metric_name, aggregation_function):
     metric_df['date'] = pd.to_datetime(metric_df['date'])
     area_names = metric_df.areaName.unique()
     ret = []
+
     populations_df = get_populations()
 
     for area_name in area_names:
         percentage_change_stats = get_percentage_change(area_name, metric_name, metric_df, aggregation_function)
 
-        per_100000 = get_cases_per_100000(percentage_change_stats["aggregation_output_last_week"],
-                                          populations_df,
-                                          metric_df,
-                                          area_name,
-                                          ) if metric_name == "newCasesBySpecimenDate" else None
+        per_100000_stats = get_cases_per_100000(percentage_change_stats["aggregation_output_last_week"],
+                                                populations_df,
+                                                metric_df,
+                                                area_name,
+                                                ) if metric_name == "newCasesBySpecimenDate" else None
 
         ret.append([
             area_name,
             percentage_change_stats["aggregation_output_week_before"],
             percentage_change_stats["aggregation_output_last_week"],
             percentage_change_stats["percentage_change"],
-            per_100000 if metric_name == "newCasesBySpecimenDate" else None
+            per_100000_stats if metric_name == "newCasesBySpecimenDate" else None
         ])
         column_names = [
             "areaName",
