@@ -74,110 +74,113 @@ def population_for_area(populations_df, area_name, area_code):
         print(f"Error getting population for area '{area_name}', area code {area_code} not found.", file=sys.stderr)
 
 
-def metric_value_per_100000(populations_df, metric_value, area_name, area_code):
+def get_cases_per_100000(cases, populations_df, metric_df, area_name):
+    area_code = area_code_for_area(metric_df, area_name)
     area_population = population_for_area(populations_df, area_name, area_code)
-    return (metric_value / area_population) * 100000
+    return (cases / area_population) * 100000
+
+
+# We want 7 days inclusive of the latest
+def dates_from_latest(latestDate):
+    return {
+        "latest": latestDate,
+        "six_days_before": latestDate - pd.Timedelta(days=6),
+        "seven_days_before": latestDate - pd.Timedelta(days=7),
+        "thirteen_days_before": latestDate - pd.Timedelta(days=13)
+    }
+
+
+def date_dependent_column_names(metric_name, dates):
+    return {
+        "week_before": f'{metric_name}-{dates["thirteen_days_before"].strftime("%m-%d-%Y")}-to-{dates["seven_days_before"].strftime("%m-%d-%Y")}',
+        "last_week": f'{metric_name}-{dates["six_days_before"].strftime("%m-%d-%Y")}-to-{dates["latest"].strftime("%m-%d-%Y")}'
+    }
 
 
 def get_percentage_change(area_name, metric_name, metric_df, aggregation_function):
     area_data = metric_df[metric_df.areaName.eq(area_name)]
 
     latest = metric_df['date'].max()
+    dates = dates_from_latest(latest)
 
-    # We want 7 days inclusive of the latest
-    six_days_before = latest - pd.Timedelta(days=6)
-    seven_days_before = latest - pd.Timedelta(days=7)
-    # As above
-    thirteen_days_before = latest - pd.Timedelta(days=13)
-
-    area_data_last_week = area_data[area_data.date.ge(six_days_before)]
-    area_data_week_before_last = area_data[area_data.date.ge(thirteen_days_before) & area_data.date.le(seven_days_before)]
+    area_data_last_week = area_data[area_data.date.ge(dates["six_days_before"])]
+    area_data_week_before_last = area_data[area_data.date.ge(dates["thirteen_days_before"])
+                                           & area_data.date.le(dates["seven_days_before"])]
 
     aggregation_output_last_week = getattr(area_data_last_week[metric_name], aggregation_function)()
     aggregation_output_week_before = getattr(area_data_week_before_last[metric_name], aggregation_function)()
 
-    percentage_change = ((aggregation_output_last_week - aggregation_output_week_before) / aggregation_output_week_before) * 100.0
+    percentage_change = ((
+                                 aggregation_output_last_week - aggregation_output_week_before) / aggregation_output_week_before) * 100.0
+
     return {
-        "aggregation_output_week_before": {
-            "column_name": f'{metric_name}-{thirteen_days_before.strftime("%m-%d-%Y")}-to-{seven_days_before.strftime("%m-%d-%Y")}',
-            "value": aggregation_output_week_before
-        },
-        "aggregation_output_last_week": {
-            "column_name": f'{metric_name}-{six_days_before.strftime("%m-%d-%Y")}-to-{latest.strftime("%m-%d-%Y")}',
-            "value": aggregation_output_last_week
-        },
-        "percentage_change": {
-            "column_name": 'percentageChange',
-            "value": percentage_change
-        }
+        "aggregation_output_week_before": aggregation_output_week_before,
+        "aggregation_output_last_week": aggregation_output_last_week,
+        "percentage_change": percentage_change,
+        "date_dependent_column_names": date_dependent_column_names(metric_name, dates)
     }
 
-def get_combined_stats(url, metric_name, aggregation_function):
+
+def percentage_changes(url, metric_name, aggregation_function):
     metric_df = pd.read_csv(url)
     metric_df['date'] = pd.to_datetime(metric_df['date'])
-
     area_names = metric_df.areaName.unique()
     ret = []
+    populations_df = get_populations()
 
-    if metric_name == "newCasesBySpecimenDate":
-        populations_df = get_populations()
-        for area_name in area_names:
-            percentage_change_stats = get_percentage_change(area_name, metric_name, metric_df, aggregation_function)
-            area_code = metric_df[metric_df.areaName.eq(area_name)].areaCode.unique()[0]
-            per_100000_population = metric_value_per_100000(populations_df, percentage_change_stats["aggregation_output_last_week"]["value"], area_name, area_code)
-            ret.append([
-                area_name,
-                percentage_change_stats["aggregation_output_week_before"]["value"],
-                percentage_change_stats["aggregation_output_last_week"]["value"],
-                per_100000_population,
-                percentage_change_stats["percentage_change"]["value"],
-            ])
-            column_names = [
-                'areaName',
-                percentage_change_stats["aggregation_output_week_before"]["column_name"],
-                percentage_change_stats["aggregation_output_last_week"]["column_name"],
-                'lastSevenDaysPer100000',
-                percentage_change_stats["percentage_change"]["column_name"],
-            ]
+    for area_name in area_names:
+        percentage_change_stats = get_percentage_change(area_name, metric_name, metric_df, aggregation_function)
 
-            ret_df = pd.DataFrame(ret, columns = column_names)
-        return ret_df
+        per_100000 = get_cases_per_100000(percentage_change_stats["aggregation_output_last_week"],
+                                          populations_df,
+                                          metric_df,
+                                          area_name,
+                                          ) if metric_name == "newCasesBySpecimenDate" else None
+
+        ret.append([
+            area_name,
+            percentage_change_stats["aggregation_output_week_before"],
+            percentage_change_stats["aggregation_output_last_week"],
+            percentage_change_stats["percentage_change"],
+            per_100000 if metric_name == "newCasesBySpecimenDate" else None
+        ])
+        column_names = [
+            "areaName",
+            percentage_change_stats["date_dependent_column_names"]["week_before"],
+            percentage_change_stats["date_dependent_column_names"]["last_week"],
+            "percentageChange",
+            "lastSevenDaysPer100000" if metric_name == "newCasesBySpecimenDate" else None
+        ]
+
+        ret_df = pd.DataFrame(ret, columns=column_names)
+    return ret_df
+
+
+def area_code_for_area(metric_df, area_name):
+    area_codes = metric_df[metric_df.areaName.eq(area_name)].areaCode.unique()
+    if area_codes.size != 1:
+        raise Exception(f"Unexpected area_codes found: {area_codes} for area_name: {area_name}")
     else:
-        for area_name in area_names:
-            percentage_change_stats = get_percentage_change(area_name, metric_name, metric_df, aggregation_function)
-            ret.append([
-                area_name,
-                percentage_change_stats["aggregation_output_week_before"]["value"],
-                percentage_change_stats["aggregation_output_last_week"]["value"],
-                percentage_change_stats["percentage_change"]["value"],
-            ])
-            column_names = [
-                'areaName',
-                percentage_change_stats["aggregation_output_week_before"]["column_name"],
-                percentage_change_stats["aggregation_output_last_week"]["column_name"],
-                percentage_change_stats["percentage_change"]["column_name"],
-            ]
-
-            ret_df = pd.DataFrame(ret, columns = column_names)
-        return ret_df
+        return area_codes[0]
 
 
 def get_areas_above_thresholds(area_type, metric_name, thresholds, aggregation_function):
     url = f"https://api.coronavirus.data.gov.uk/v2/data?areaType={area_type}&metric={metric_name}&format=csv"
-    df = get_combined_stats(url, metric_name, aggregation_function)
+    df = percentage_changes(url, metric_name, aggregation_function)
 
     print(f"{metric_name} data:", file=sys.stderr)
     print(df.to_string(), file=sys.stderr)
 
     if metric_name == "newCasesBySpecimenDate":
         df = df[
-            df.percentageChange.gt(thresholds["percentage_change_threshold"]) & df.lastSevenDaysPer100000.gt(thresholds["metric_value_per_100000_threshold"])
+            df.percentageChange.gt(thresholds["percentage_change_threshold"]) & df.lastSevenDaysPer100000.gt(
+                thresholds["metric_value_per_100000_threshold"])
             ].sort_values("percentageChange", ascending=False)
         return df
     else:
         df = df[
             df.percentageChange.gt(thresholds["percentage_change_threshold"])
-            ].sort_values("percentageChange", ascending=False)
+        ].sort_values("percentageChange", ascending=False)
         return df
 
 
