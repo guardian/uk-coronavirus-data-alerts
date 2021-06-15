@@ -12,7 +12,7 @@ METRICS_BUCKET = "investigations-data-dev"
 METRICS_KEY = "uk-coronavirus-data-alerts/metrics.json"
 
 PERCENTAGE_CHANGE_THRESHOLD = 100.0
-CASES_PER_100000_POPULATION_THRESHOLD = 50.0
+CASES_PER_100000_POPULATION_THRESHOLD = 100.0
 
 NOTIFY_EMAILS = os.environ.get("NOTIFY_EMAIL_ADDRESSES")
 if NOTIFY_EMAILS is None:
@@ -70,8 +70,8 @@ def population_for_area(populations_df, area_name, area_code):
     try:
         area_population = populations_df.at[area_code, "All ages"]
         return area_population
-    except KeyError:
-        print(f"Error getting population for area '{area_name}', area code {area_code} not found.", file=sys.stderr)
+    except KeyError as e:
+        print(f"Error getting population for area '{area_name}', area code {area_code} not found.", e, file=sys.stderr)
 
 
 def get_cases_per_100000(cases, populations_df, metric_df, area_name):
@@ -79,8 +79,8 @@ def get_cases_per_100000(cases, populations_df, metric_df, area_name):
     try:
         area_population = population_for_area(populations_df, area_name, area_code)
         return (cases / area_population) * 100000
-    except TypeError:
-        print(f"Cannot calculate population for area ${area_name}", file=sys.stderr)
+    except TypeError as e:
+        print(f"Cannot calculate population for area ${area_name}", e, file=sys.stderr)
 
 
 # We want 7 days inclusive of the latest
