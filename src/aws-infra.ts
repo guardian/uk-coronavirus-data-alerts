@@ -1,4 +1,4 @@
-import { App, Fn, Arn, CfnParameter } from "@aws-cdk/core";
+import { App, Fn, Arn, CfnParameter, Duration } from "@aws-cdk/core";
 import { Runtime } from "@aws-cdk/aws-lambda";
 import { Schedule } from "@aws-cdk/aws-events";
 import { PolicyStatement } from "@aws-cdk/aws-iam";
@@ -34,7 +34,8 @@ class UKCoronavirusDataAlertsStack extends GuStack {
                     schedule: Schedule.expression('cron(0 8 ? * MON-FRI *)'),
                     description: 'Check UK coronavirus data every weekday at 8AM'
                 }
-            ]
+            ],
+            timeout: Duration.minutes(1)
         });
 
         lambda.addToRolePolicy(new PolicyStatement({
