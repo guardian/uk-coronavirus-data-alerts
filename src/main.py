@@ -66,6 +66,17 @@ def get_populations():
     return df
 
 
+def get_nhs_regions_populations():
+    # TODO: find latest (published weekly, work back from today)
+    url ="https://www.england.nhs.uk/statistics/wp-content/uploads/sites/2/2021/06/COVID-19-weekly-announced-vaccinations-24-June-2021.xlsx"
+    resp = requests.get(url)
+    df = pd.read_excel(io=resp.content, sheet_name="Population estimates (ONS)", header=12, usecols="B,D:Q", index_col=0)
+
+    print(f"Nhs regions populations df: ${df}")
+    # TODO: sum populations for each age range
+    return df
+
+
 def population_for_area(populations_df, area_name, area_code):
     try:
         area_population = populations_df.at[area_code, "All ages"]
@@ -129,13 +140,15 @@ def percentage_changes(url, metric_name, aggregation_function):
     area_names = metric_df.areaName.unique()
     ret = []
 
-    populations_df = get_populations()
+    ltla_populations_df = get_populations()
+    nhs_region_populations_df = get_nhs_regions_populations()
+
 
     for area_name in area_names:
         percentage_change_stats = get_percentage_change(area_name, metric_name, metric_df, aggregation_function)
 
         per_100000_stats = get_cases_per_100000(percentage_change_stats["aggregation_output_last_week"],
-                                                populations_df,
+                                                ltla_populations_df,
                                                 metric_df,
                                                 area_name,
                                                 ) if metric_name == "newCasesBySpecimenDate" else None
@@ -171,7 +184,8 @@ def get_areas_above_thresholds(area_type, metric_name, thresholds, aggregation_f
     url = f"https://api.coronavirus.data.gov.uk/v2/data?areaType={area_type}&metric={metric_name}&format=csv"
     df = percentage_changes(url, metric_name, aggregation_function)
 
-    print(f"{metric_name} data:", file=sys.stderr)
+#TODO uncomment
+    # print(f"{metric_name} data:", file=sys.stderr)
     print(df.to_string(), file=sys.stderr)
 
     if metric_name == "newCasesBySpecimenDate":
@@ -274,8 +288,9 @@ def check_last_two_weeks_of_metrics():
 
 
 def lambda_handler(event, lambda_context):
-    compare_available_metrics()
-    check_last_two_weeks_of_metrics()
+    # compare_available_metrics()
+    # check_last_two_weeks_of_metrics()
+    get_nhs_regions_populations()
 
 
 if __name__ == "__main__":
