@@ -65,15 +65,12 @@ def get_populations():
 
     return df
 
-
 def get_nhs_regions_populations():
     # TODO: find latest (published weekly, work back from today)
     url ="https://www.england.nhs.uk/statistics/wp-content/uploads/sites/2/2021/06/COVID-19-weekly-announced-vaccinations-24-June-2021.xlsx"
     resp = requests.get(url)
-    df = pd.read_excel(io=resp.content, sheet_name="Population estimates (ONS)", header=12, usecols="B,D:Q", index_col=0)
+    df = pd.read_excel(io=resp.content, sheet_name="Population estimates (ONS)", header=12, usecols="B,D,R", index_col=0, nrows=9)
 
-    print(f"Nhs regions populations df: ${df}")
-    # TODO: sum populations for each age range
     return df
 
 
@@ -94,6 +91,23 @@ def get_cases_per_100000(cases, populations_df, metric_df, area_name):
         print(f"Cannot calculate population for area ${area_name}", e, file=sys.stderr)
 
 
+def convert_nhs_region_key(nhs_region_key):
+    if nhs_region_key == "East of England":
+        return "East Of England"
+    elif nhs_region_key == "North East and Yorkshire":
+        return "North East And Yorkshire"
+    else:
+        return nhs_region_key
+
+def get_metric_per_100000_nhs_region(metric, nhs_populations_df, nhs_region_name):
+    nhs_region = convert_nhs_region_key(nhs_region_name)
+    try:
+        region_population = nhs_populations_df.at[nhs_region, "Under 16"] + nhs_populations_df.at[nhs_region, "16+"]
+        return (metric / region_population) * 100000
+    except TypeError as e:
+        print(f"Cannot calculate population for region ${nhs_region_name}")
+
+
 # We want 7 days inclusive of the latest
 def dates_from_latest(latestDate):
     return {
@@ -102,7 +116,6 @@ def dates_from_latest(latestDate):
         "seven_days_before": latestDate - pd.Timedelta(days=7),
         "thirteen_days_before": latestDate - pd.Timedelta(days=13)
     }
-
 
 def date_dependent_column_names(metric_name, dates):
     return {
@@ -143,7 +156,6 @@ def percentage_changes(url, metric_name, aggregation_function):
     ltla_populations_df = get_populations()
     nhs_region_populations_df = get_nhs_regions_populations()
 
-
     for area_name in area_names:
         percentage_change_stats = get_percentage_change(area_name, metric_name, metric_df, aggregation_function)
 
@@ -151,21 +163,24 @@ def percentage_changes(url, metric_name, aggregation_function):
                                                 ltla_populations_df,
                                                 metric_df,
                                                 area_name,
-                                                ) if metric_name == "newCasesBySpecimenDate" else None
+                                                ) if metric_name == "newCasesBySpecimenDate" \
+            else get_metric_per_100000_nhs_region(percentage_change_stats["aggregation_output_last_week"],
+                                                  nhs_region_populations_df,
+                                                  area_name)
 
         ret.append([
             area_name,
             percentage_change_stats["aggregation_output_week_before"],
             percentage_change_stats["aggregation_output_last_week"],
             percentage_change_stats["percentage_change"],
-            per_100000_stats if metric_name == "newCasesBySpecimenDate" else None
+            per_100000_stats
         ])
         column_names = [
             "areaName",
             percentage_change_stats["date_dependent_column_names"]["week_before"],
             percentage_change_stats["date_dependent_column_names"]["last_week"],
             "percentageChange",
-            "lastSevenDaysPer100000" if metric_name == "newCasesBySpecimenDate" else None
+            "lastSevenDaysPer100000"
         ]
 
         ret_df = pd.DataFrame(ret, columns=column_names)
@@ -184,8 +199,7 @@ def get_areas_above_thresholds(area_type, metric_name, thresholds, aggregation_f
     url = f"https://api.coronavirus.data.gov.uk/v2/data?areaType={area_type}&metric={metric_name}&format=csv"
     df = percentage_changes(url, metric_name, aggregation_function)
 
-#TODO uncomment
-    # print(f"{metric_name} data:", file=sys.stderr)
+    print(f"{metric_name} data:", file=sys.stderr)
     print(df.to_string(), file=sys.stderr)
 
     if metric_name == "newCasesBySpecimenDate":
@@ -225,7 +239,7 @@ def send_notification_email(subject, body):
             }
         )
 
-        print(f"Email sent succesfully", file=sys.stderr)
+        print(f"Email sent successfully", file=sys.stderr)
 
 
 def compare_available_metrics():
@@ -288,9 +302,8 @@ def check_last_two_weeks_of_metrics():
 
 
 def lambda_handler(event, lambda_context):
-    # compare_available_metrics()
-    # check_last_two_weeks_of_metrics()
-    get_nhs_regions_populations()
+    compare_available_metrics()
+    check_last_two_weeks_of_metrics()
 
 
 if __name__ == "__main__":
