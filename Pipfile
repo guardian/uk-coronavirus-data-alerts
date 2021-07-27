@@ -10,7 +10,6 @@ requests = "*"
 boto3 = "*"
 pandas = "*"
 xlrd = "*"
-openpyxl = "*"
 
 [requires]
 python_version = "3.8"
