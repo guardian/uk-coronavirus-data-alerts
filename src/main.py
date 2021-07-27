@@ -56,7 +56,7 @@ def save_metric_definitions(metric_names):
     print(f"Done", file=sys.stderr)
 
 
-def get_populations():
+def get_ltla_populations():
     url = "https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/populationandmigration/populationestimates" \
           "/datasets/populationestimatesforukenglandandwalesscotlandandnorthernireland" \
           "/mid2019april2019localauthoritydistrictcodes/ukmidyearestimates20192019ladcodes.xls"
@@ -153,7 +153,7 @@ def percentage_changes(url, metric_name, aggregation_function):
     area_names = metric_df.areaName.unique()
     ret = []
 
-    ltla_populations_df = get_populations()
+    ltla_populations_df = get_ltla_populations()
     nhs_region_populations_df = get_nhs_regions_populations()
 
     for area_name in area_names:
