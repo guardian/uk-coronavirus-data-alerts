@@ -35,7 +35,7 @@ class UKCoronavirusDataAlertsStack extends GuStack {
                     description: 'Check UK coronavirus data every weekday at 8AM'
                 }
             ],
-            timeout: Duration.minutes(1)
+            timeout: Duration.minutes(2)
         });
 
         lambda.addToRolePolicy(new PolicyStatement({
