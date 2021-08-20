@@ -6,6 +6,7 @@ import json
 import pandas as pd
 import requests
 import textwrap
+from enum import Enum
 
 AWS_REGION = "eu-west-1"
 METRICS_BUCKET = "investigations-data-dev"
@@ -25,6 +26,13 @@ if "AWS_EXECUTION_ENV" in os.environ:
     boto_session = boto3.session.Session()
 else:
     boto_session = boto3.session.Session(profile_name = "investigations")
+
+class EmailTypes(Enum):
+    VERIFIED = "VERIFIED"
+    UNVERIFIED = "UNVERIFIED"
+
+EMAIL_TYPE_STR = os.environ.get("EMAIL_TYPE")
+EMAIL_TYPE = EmailTypes(EMAIL_TYPE_STR) if EMAIL_TYPE_STR in EmailTypes.__members__ else EmailTypes.VERIFIED
 
 s3_client = boto_session.client("s3", region_name = AWS_REGION)
 ses_client = boto_session.client("ses", region_name = AWS_REGION)
