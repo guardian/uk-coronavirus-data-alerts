@@ -117,28 +117,39 @@ def get_metric_per_100000_nhs_region(metric, nhs_populations_df, nhs_region_name
 
 
 # We want 7 days inclusive of the latest
-def dates_from_latest(latestDate):
+def dates_from_upper_bound(upper_bound):
     return {
-        "latest": latestDate,
-        "six_days_before": latestDate - pd.Timedelta(days=6),
-        "seven_days_before": latestDate - pd.Timedelta(days=7),
-        "thirteen_days_before": latestDate - pd.Timedelta(days=13)
+        "upper_bound": upper_bound,
+        "six_days_before": upper_bound - pd.Timedelta(days=6),
+        "seven_days_before": upper_bound - pd.Timedelta(days=7),
+        "thirteen_days_before": upper_bound - pd.Timedelta(days=13)
     }
 
 def date_dependent_column_names(metric_name, dates):
     return {
-        "week_before": f'{metric_name}-{dates["thirteen_days_before"].strftime("%m-%d-%Y")}-to-{dates["seven_days_before"].strftime("%m-%d-%Y")}',
-        "last_week": f'{metric_name}-{dates["six_days_before"].strftime("%m-%d-%Y")}-to-{dates["latest"].strftime("%m-%d-%Y")}'
+        "week_before": f'{metric_name}-{dates["thirteen_days_before"].strftime("%d-%m-%Y")}-to-{dates["seven_days_before"].strftime("%d-%m-%Y")}',
+        "last_week": f'{metric_name}-{dates["six_days_before"].strftime("%d-%m-%Y")}-to-{dates["upper_bound"].strftime("%d-%m-%Y")}'
     }
 
 
 def get_percentage_change(area_name, metric_name, metric_df, aggregation_function):
     area_data = metric_df[metric_df.areaName.eq(area_name)]
 
-    latest = metric_df['date'].max()
-    dates = dates_from_latest(latest)
+    max_report_date = metric_df['date'].max()
+    """
+    From https://coronavirus.data.gov.uk/: "Data shown are cases by specimen date and because these are 
+    incomplete for the most recent dates, the period represented is the 7 days ending 5 days before the date 
+    when the website was last updated."
+    VERIFIED - up to five days before most recent stats
+    UNIVERIFIED - up to date of most recent stats
+    """
+    upper_bound = max_report_date - pd.Timedelta(days=4) if EMAIL_TYPE is EmailTypes.VERIFIED else max_report_date
 
-    area_data_last_week = area_data[area_data.date.ge(dates["six_days_before"])]
+    dates = dates_from_upper_bound(upper_bound)
+
+
+    area_data_last_week = area_data[area_data.date.ge(dates["six_days_before"])
+                                            & area_data.date.le(dates["upper_bound"])]
     area_data_week_before_last = area_data[area_data.date.ge(dates["thirteen_days_before"])
                                            & area_data.date.le(dates["seven_days_before"])]
 
@@ -161,6 +172,7 @@ def percentage_changes(url, metric_name, aggregation_function):
     area_names = metric_df.areaName.unique()
     ret = []
 
+    # TODO move outside of this function
     ltla_populations_df = get_ltla_populations()
     nhs_region_populations_df = get_nhs_regions_populations()
 
@@ -299,12 +311,22 @@ def check_last_two_weeks_of_metrics():
     to_alert = [f"<p>{df.to_html()}</p>" for df in all_data if len(df) > 0]
 
     if len(to_alert) > 0:
+        if EMAIL_TYPE is EmailTypes.VERIFIED:
+            subject = "[UK Coronavirus Data Alert] New metrics available"
+            email_type_text = "<p>These metrics are in line with what is published on the government dashboard at <a href='https://coronavirus.data.gov.uk/'>coronavirus.data.gov.uk</a> " \
+                "As such, the period represented is the 7 days ending 5 days before the date when the website was last updated.</p>"
+        else:
+            subject = "[UK Coronavirus Data Alert] New metrics available. NOT FOR PUBLISH - most recent, unverified metrics"
+            email_type_text = "<p>WARNING: The period represented is the 7 days ending with the latest day for which data is available. This is different from the government dashboard which " \
+                "looks at the period ending five days before the website was last updated.</p>"
+
         body = textwrap.dedent(f"""
+            {email_type_text}
             <p>Some metrics have exceeded {percentage_change_threshold}% change week on week:</p>
             {"".join(to_alert)}
             <p>Check https://coronavirus.data.gov.uk/</p>
         """)
-        send_notification_email("UK Coronavirus Data Alert", body)
+        send_notification_email(subject, body)
     else:
         print(f"No metric exceeded {percentage_change_threshold}% change", file=sys.stderr)
 
