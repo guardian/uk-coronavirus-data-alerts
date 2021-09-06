@@ -141,7 +141,7 @@ def get_percentage_change(area_name, metric_name, metric_df, aggregation_functio
     incomplete for the most recent dates, the period represented is the 7 days ending 5 days before the date 
     when the website was last updated."
     VERIFIED - up to five days before most recent stats
-    UNIVERIFIED - up to date of most recent stats
+    UNVERIFIED - up to date of most recent stats
     """
     upper_bound = max_report_date - pd.Timedelta(days=4) if EMAIL_TYPE is EmailTypes.VERIFIED else max_report_date
 

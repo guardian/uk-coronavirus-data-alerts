@@ -17,13 +17,21 @@ class UKCoronavirusDataAlertsStack extends GuStack {
             description: 'Comma-separated list of email addresses to notify'
         });
 
+        const emailType = new CfnParameter(this, 'emailType', {
+            description: 'Either \'VERIFIED\', meaning the data is for the period of 7 days ending 5 days before ' +
+                'the website was last updated, and matches what is on the government dashboard at https://coronavirus.data.gov.uk/,' +
+                ' or \'UNVERIFIED\', meaning the period is up to the latest date for which data has been published and ' +
+                'does not match what is on the government dashboard'
+        });
+
         const lambda = new GuScheduledLambda(this, 'Lambda', {
             app,
             runtime: Runtime.PYTHON_3_8,
             handler: 'main.lambda_handler',
             fileName: `${app}.zip`,
             environment: {
-                'NOTIFY_EMAIL_ADDRESSES': notifyEmailAddresses.valueAsString
+                'NOTIFY_EMAIL_ADDRESSES': notifyEmailAddresses.valueAsString,
+                'EMAIL_TYPE': emailType.valueAsString
             },
             monitoringConfiguration: {
                 toleratedErrorPercentage: 0,
