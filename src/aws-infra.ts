@@ -7,21 +7,14 @@ import { GuStack } from "@guardian/cdk/lib/constructs/core";
 import { GuScheduledLambda } from "@guardian/cdk/lib/patterns/scheduled-lambda";
 
 class UKCoronavirusDataAlertsStack extends GuStack {
-    constructor(scope: App, id: string, props: GuStackProps) {
+    constructor(scope: App, id: string, emailType: string, props: GuStackProps) {
         super(scope, id, props);
 
-        const app = 'uk-coronavirus-data-alerts';
+        const app = `${emailType}-uk-coronavirus-data-alerts`;
 
         // Pass these as a parameter to avoid putting email addresses in the open
         const notifyEmailAddresses = new CfnParameter(this, 'NotifyEmailAddresses', {
             description: 'Comma-separated list of email addresses to notify'
-        });
-
-        const emailType = new CfnParameter(this, 'emailType', {
-            description: 'Either \'VERIFIED\', meaning the data is for the period of 7 days ending 5 days before ' +
-                'the website was last updated, and matches what is on the government dashboard at https://coronavirus.data.gov.uk/,' +
-                ' or \'UNVERIFIED\', meaning the period is up to the latest date for which data has been published and ' +
-                'does not match what is on the government dashboard'
         });
 
         const lambda = new GuScheduledLambda(this, 'Lambda', {
@@ -31,7 +24,7 @@ class UKCoronavirusDataAlertsStack extends GuStack {
             fileName: `${app}.zip`,
             environment: {
                 'NOTIFY_EMAIL_ADDRESSES': notifyEmailAddresses.valueAsString,
-                'EMAIL_TYPE': emailType.valueAsString
+                'EMAIL_TYPE': emailType
             },
             monitoringConfiguration: {
                 toleratedErrorPercentage: 0,
@@ -62,6 +55,10 @@ class UKCoronavirusDataAlertsStack extends GuStack {
     }
 }
 
-new UKCoronavirusDataAlertsStack(new App(), 'UKCoronavirusDataAlerts', {
+new UKCoronavirusDataAlertsStack(new App(), 'UKCoronavirusDataAlerts', 'VERIFIED', {
+    stack: 'pfi-structured'
+});
+
+new UKCoronavirusDataAlertsStack(new App(), 'UKCoronavirusDataAlerts', 'UNVERIFIED', {
     stack: 'pfi-structured'
 });
