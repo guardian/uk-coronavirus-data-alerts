@@ -9,7 +9,7 @@ deployments:
       templatePath: cloudformation.yaml
       createStackIfAbsent: false
 
-  UNVERIFIED-uk-coronavirus-data-alerts:
+  uk-coronavirus-data-alerts-verified:
     type: aws-lambda
     dependencies: [cloudformation]
     parameters:
@@ -17,7 +17,7 @@ deployments:
       bucketSsmLookup: true
       lookupByTags: true
 
-  VERIFIED-uk-coronavirus-data-alerts:
+  uk-coronavirus-data-alerts-unverified:
     type: aws-lambda
     dependencies: [cloudformation]
     parameters:
