@@ -13,7 +13,7 @@ deployments:
     type: aws-lambda
     dependencies: [cloudformation]
     parameters:
-      fileName: uk-coronavirus-data-alerts.zip
+      fileName: uk-coronavirus-data-alerts-verified.zip
       bucketSsmLookup: true
       lookupByTags: true
 
@@ -21,6 +21,6 @@ deployments:
     type: aws-lambda
     dependencies: [cloudformation]
     parameters:
-      fileName: uk-coronavirus-data-alerts.zip
+      fileName: uk-coronavirus-data-alerts-unverified.zip
       bucketSsmLookup: true
       lookupByTags: true
