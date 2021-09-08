@@ -41,13 +41,11 @@ class UKCoronavirusDataAlertsStack extends GuStack {
         // Pass these as a parameter to avoid putting email addresses in the open
         const verifiedNotifyEmailAddresses = new CfnParameter(this, 'NotifyEmailAddressesVerified', {
             description: 'Comma-separated list of email addresses to notify for the verified data matching the government dashboard',
-            type: 'String',
-            default: ''
+            type: 'String'
         });
         const unverifiedNotifyEmailAddresses = new CfnParameter(this, 'NotifyEmailAddressesUnverified', {
             description: 'Comma-separated list of email addresses to notify for the latest (unverified) data',
-            type: 'String',
-            default: ''
+            type: 'String'
         });
 
         const lambdas = [constructLambda('VERIFIED', verifiedNotifyEmailAddresses, verifiedApp, this),
