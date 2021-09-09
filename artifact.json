@@ -9,9 +9,14 @@
             "compress": false
         },
         {
-            "action": "uk-coronavirus-data-alerts",
+            "action": "uk-coronavirus-data-alerts-verified",
             "path": "dist/lambda",
             "compress": "zip"
+        },
+        {
+          "action": "uk-coronavirus-data-alerts-unverified",
+          "path": "dist/lambda",
+          "compress": "zip"
         }
     ]
 }
