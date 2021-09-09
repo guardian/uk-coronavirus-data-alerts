@@ -65,11 +65,11 @@ def save_metric_definitions(metric_names):
 
 
 def get_ltla_populations():
-    url = "https://www.ons.gov.uk/file?uri=/peoplepopulationandcommunity/populationandmigration/populationestimates" \
-          "/datasets/populationestimatesforukenglandandwalesscotlandandnorthernireland" \
-          "/mid2019april2019localauthoritydistrictcodes/ukmidyearestimates20192019ladcodes.xls"
+    url = "https://www.ons.gov.uk/file?uri=%2fpeoplepopulationandcommunity%2fpopulationandmigration%2fpopulationestimates" \
+          "%2fdatasets%2fpopulationestimatesforukenglandandwalesscotlandandnorthernireland%2fmid2020/" \
+          "ukpopestimatesmid2020on2021geography.xls"
     resp = requests.get(url)
-    df = pd.read_excel(io=resp.content, sheet_name="MYE2 - Persons", header=4, usecols="A,B,D", index_col=0)
+    df = pd.read_excel(io=resp.content, sheet_name="MYE2 - Persons", header=7, usecols="A,B,D", index_col=0)
 
     return df
 
@@ -96,7 +96,7 @@ def get_cases_per_100000(cases, populations_df, metric_df, area_name):
         area_population = population_for_area(populations_df, area_name, area_code)
         return (cases / area_population) * 100000
     except TypeError as e:
-        print(f"Cannot calculate population for area ${area_name}", e, file=sys.stderr)
+        print(f"Cannot calculate population for area {area_name}", e, file=sys.stderr)
 
 
 def convert_nhs_region_key(nhs_region_key):
@@ -192,8 +192,8 @@ def percentage_changes(url, metric_name, aggregation_function):
             area_name,
             percentage_change_stats["aggregation_output_week_before"],
             percentage_change_stats["aggregation_output_last_week"],
-            percentage_change_stats["percentage_change"],
-            per_100000_stats
+            round(percentage_change_stats["percentage_change"], 1),
+            round(per_100000_stats, 1) if per_100000_stats is not None else None
         ])
         column_names = [
             "areaName",
