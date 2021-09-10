@@ -318,7 +318,7 @@ def check_last_two_weeks_of_metrics():
         else:
             subject = "[UK Coronavirus Data Alert] New metrics available. NOT FOR PUBLISH - most recent, unverified metrics"
             email_type_text = "<p>WARNING: The period represented is the 7 days ending with the latest day for which data is available. This is different from the government dashboard which " \
-                "looks at the period ending five days before the website was last updated.</p>"
+                "looks at the period ending 5 days before the website was last updated.</p>"
 
         body = textwrap.dedent(f"""
             {email_type_text}

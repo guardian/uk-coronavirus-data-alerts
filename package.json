@@ -2,10 +2,10 @@
   "name": "uk-coronavirus-data-alerts",
   "version": "0.0.1",
   "dependencies": {
-    "@guardian/cdk": "guardian/cdk#make-it-possible-to-define-multiple-lambdas-per-stack",
+    "@guardian/cdk": "25.0.1",
     "@guardian/node-riffraff-artifact": "^0.2.1",
     "@tsconfig/node14": "^1.0.0",
-    "cdk": "1.120.0",
+    "cdk": "1.122.0",
     "ts-node": "^9.1.1",
     "typescript": "^4.2.4"
   },
