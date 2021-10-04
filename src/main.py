@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 import os
 import sys
 import boto3
@@ -193,6 +192,8 @@ def percentage_changes(url, metric_name, aggregation_function):
         column_names = [
             "areaName",
             percentage_change_stats["date_dependent_column_names"]["week_before"],
+            # Values in this column are filtered by index later! If these columns are changed 
+            # then get_areas_above_thresholds will have to be updated.
             percentage_change_stats["date_dependent_column_names"]["last_week"],
             "percentageChange",
             "lastSevenDaysPer100000"
@@ -232,6 +233,7 @@ def get_areas_above_thresholds(area_type, metric_name, thresholds, aggregation_f
 
     print(f"{metric_name} data after filtering + sorting:", file=sys.stderr)
     print(df.to_string(), file=sys.stderr)
+    return df
 
 
 def send_notification_email(subject, body):
@@ -294,12 +296,12 @@ def compare_available_metrics():
     save_metric_definitions(current)
 
 
+
 def check_last_two_weeks_of_metrics():
     hospitalizations_thresholds = {"percentage_change_threshold": 50.0, "metric_value_threshold": 30}
     cases_thresholds = {"percentage_change_threshold": 100.0, "metric_value_per_100000_threshold": 100.0}
 
     all_data = [
-        get_areas_above_thresholds("nhsTrust", "newAdmissions", hospitalizations_thresholds, 'sum'),
         get_areas_above_thresholds("ltla", "newCasesBySpecimenDate", cases_thresholds, 'sum'),
         get_areas_above_thresholds("nhsTrust", "hospitalCases", hospitalizations_thresholds, 'mean')
     ]
@@ -318,13 +320,13 @@ def check_last_two_weeks_of_metrics():
 
         body = textwrap.dedent(f"""
             {email_type_text}
-            <p>Some metrics have exceeded THE CHANGE THRESHOLD??? change week on week:</p>
+            <p>Some metrics have exceeded the change threshold week on week:</p>
             {"".join(to_alert)}
             <p>Check https://coronavirus.data.gov.uk/</p>
         """)
         send_notification_email(subject, body)
     else:
-        print(f"No metric exceeded THE CHANGE THRESHOLD??? change", file=sys.stderr)
+        print(f"No metric exceeded the change threshold", file=sys.stderr)
 
 
 def lambda_handler(event, lambda_context):
