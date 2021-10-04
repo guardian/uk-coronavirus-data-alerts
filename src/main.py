@@ -171,33 +171,47 @@ def percentage_changes(url, metric_name, aggregation_function):
     for area_name in area_names:
         percentage_change_stats = get_percentage_change(area_name, metric_name, metric_df, aggregation_function)
 
+        row = [
+            area_name,
+            percentage_change_stats["aggregation_output_week_before"],
+            percentage_change_stats["aggregation_output_last_week"],
+            round(percentage_change_stats["percentage_change"], 1),
+        ]
+        
+
         if metric_name == "newCasesBySpecimenDate":
             per_100000_stats = get_cases_per_100000(percentage_change_stats["aggregation_output_last_week"],
                                                 ltla_populations_df,
                                                 metric_df,
                                                 area_name,
                                                 )
+
+            row.append(round(per_100000_stats, 1) if per_100000_stats is not None else None)
+
+            # Values in this column are filtered by index later! If these columns are changed 
+            # then get_areas_above_thresholds will have to be updated.
+            column_names = [
+                "areaName",
+                percentage_change_stats["date_dependent_column_names"]["week_before"],
+                percentage_change_stats["date_dependent_column_names"]["last_week"],
+                "percentageChange",
+                "lastSevenDaysPer100000"
+            ]
+
         else: 
             # We don't have a reliable source for NHS Trust populations, so can't calculate
             # stats per 100,000.
             per_100000_stats = None
 
-        ret.append([
-            area_name,
-            percentage_change_stats["aggregation_output_week_before"],
-            percentage_change_stats["aggregation_output_last_week"],
-            round(percentage_change_stats["percentage_change"], 1),
-            round(per_100000_stats, 1) if per_100000_stats is not None else None
-        ])
-        column_names = [
-            "areaName",
-            percentage_change_stats["date_dependent_column_names"]["week_before"],
-            # Values in this column are filtered by index later! If these columns are changed 
-            # then get_areas_above_thresholds will have to be updated.
-            percentage_change_stats["date_dependent_column_names"]["last_week"],
-            "percentageChange",
-            "lastSevenDaysPer100000"
-        ]
+            # Since we only have population data for regions and not NHS, trusts omit the last column.
+            column_names = [
+                "areaName",
+                percentage_change_stats["date_dependent_column_names"]["week_before"],
+                percentage_change_stats["date_dependent_column_names"]["last_week"],
+                "percentageChange",
+            ]  
+
+        ret.append(row)  
 
         ret_df = pd.DataFrame(ret, columns=column_names)
     return ret_df
@@ -298,9 +312,8 @@ def compare_available_metrics():
 
 
 def check_last_two_weeks_of_metrics():
-    hospitalizations_thresholds = {"percentage_change_threshold": 50.0, "metric_value_threshold": 30}
-    cases_thresholds = {"percentage_change_threshold": 100.0, "metric_value_per_100000_threshold": 100.0}
-
+    hospitalizations_thresholds = {"percentage_change_threshold": 25.0, "metric_value_threshold": 0}
+    cases_thresholds = {"percentage_change_threshold": 50.0, "metric_value_per_100000_threshold": 50.0}
     all_data = [
         get_areas_above_thresholds("ltla", "newCasesBySpecimenDate", cases_thresholds, 'sum'),
         get_areas_above_thresholds("nhsTrust", "hospitalCases", hospitalizations_thresholds, 'mean')
