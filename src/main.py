@@ -312,7 +312,7 @@ def compare_available_metrics():
 
 
 def check_last_two_weeks_of_metrics():
-    hospitalizations_thresholds = {"percentage_change_threshold": 25.0, "metric_value_threshold": 0}
+    hospitalizations_thresholds = {"percentage_change_threshold": 50.0, "metric_value_threshold": 30}
     cases_thresholds = {"percentage_change_threshold": 50.0, "metric_value_per_100000_threshold": 50.0}
     all_data = [
         get_areas_above_thresholds("ltla", "newCasesBySpecimenDate", cases_thresholds, 'sum'),
