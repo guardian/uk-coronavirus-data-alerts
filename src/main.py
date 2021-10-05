@@ -95,15 +95,6 @@ def get_cases_per_100000(cases, populations_df, metric_df, area_name):
     except TypeError as e:
         print(f"Cannot calculate population for area {area_name}", e, file=sys.stderr)
 
-
-def convert_nhs_region_key(nhs_region_key):
-    if nhs_region_key == "East of England":
-        return "East Of England"
-    elif nhs_region_key == "North East and Yorkshire":
-        return "North East And Yorkshire"
-    else:
-        return nhs_region_key
-
 # We want 7 days inclusive of the latest
 def dates_from_upper_bound(upper_bound):
     return {
@@ -203,7 +194,7 @@ def percentage_changes(url, metric_name, aggregation_function):
             # stats per 100,000.
             per_100000_stats = None
 
-            # Since we only have population data for regions and not NHS, trusts omit the last column.
+            # Since we only have population data for ltla regions and not NHS trusts omit the last column.
             column_names = [
                 "areaName",
                 percentage_change_stats["date_dependent_column_names"]["week_before"],
@@ -225,7 +216,8 @@ def area_code_for_area(metric_df, area_name):
         return area_codes[0]
 
 
-def get_areas_above_thresholds(area_type, metric_name, thresholds, aggregation_function):
+def get_areas_above_thresholds(area_type, metric_name, aggregation_function):
+    thresholds = {"percentage_change_threshold": 50.0, "new_cases_per_100000_threshold": 50.0, "hospital_cases_threshold": 30}
     url = f"https://api.coronavirus.data.gov.uk/v2/data?areaType={area_type}&metric={metric_name}&format=csv"
     df = percentage_changes(url, metric_name, aggregation_function)
 
@@ -233,16 +225,16 @@ def get_areas_above_thresholds(area_type, metric_name, thresholds, aggregation_f
     print(df.to_string(), file=sys.stderr)
 
     if metric_name == "newCasesBySpecimenDate":
-        # TODO: if we can't find population data for a region, ignore metric_value_per_100000_threshold
+        # TODO: if we can't find population data for a region, ignore new_cases_per_100000_threshold
         df = df[
             df.percentageChange.gt(thresholds["percentage_change_threshold"]) & df.lastSevenDaysPer100000.gt(
-                thresholds["metric_value_per_100000_threshold"])
+                thresholds["new_cases_per_100000_threshold"])
             ].sort_values("percentageChange", ascending=False)
     else:
         df = df[
             df.percentageChange.gt(thresholds["percentage_change_threshold"]) 
             # accessing third column by index since its name changes every day
-            & df[df.columns[2]].gt(thresholds["metric_value_threshold"])
+            & df[df.columns[2]].gt(thresholds["hospital_cases_threshold"])
         ].sort_values("percentageChange", ascending=False)
 
     print(f"{metric_name} data after filtering + sorting:", file=sys.stderr)
@@ -312,11 +304,9 @@ def compare_available_metrics():
 
 
 def check_last_two_weeks_of_metrics():
-    hospitalizations_thresholds = {"percentage_change_threshold": 50.0, "metric_value_threshold": 30}
-    cases_thresholds = {"percentage_change_threshold": 50.0, "metric_value_per_100000_threshold": 50.0}
     all_data = [
-        get_areas_above_thresholds("ltla", "newCasesBySpecimenDate", cases_thresholds, 'sum'),
-        get_areas_above_thresholds("nhsTrust", "hospitalCases", hospitalizations_thresholds, 'mean')
+        get_areas_above_thresholds("ltla", "newCasesBySpecimenDate", 'sum'),
+        get_areas_above_thresholds("nhsTrust", "hospitalCases", 'mean')
     ]
 
     to_alert = [f"<p>{df.to_html()}</p>" for df in all_data if len(df) > 0]
