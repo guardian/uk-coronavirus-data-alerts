@@ -217,7 +217,7 @@ def area_code_for_area(metric_df, area_name):
 
 
 def get_areas_above_thresholds(area_type, metric_name, aggregation_function):
-    thresholds = {"percentage_change_threshold": 50.0, "new_cases_per_100000_threshold": 50.0, "hospital_cases_threshold": 20}
+    thresholds = {"percentage_change_threshold": 50.0, "new_cases_per_100000_threshold": 100.0, "hospital_cases_threshold": 20}
     url = f"https://api.coronavirus.data.gov.uk/v2/data?areaType={area_type}&metric={metric_name}&format=csv"
     df = percentage_changes(url, metric_name, aggregation_function)
 
