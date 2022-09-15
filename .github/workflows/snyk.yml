@@ -11,5 +11,6 @@ jobs:
       ORG: guardian-test
       SKIP_NODE: false
       SKIP_PYTHON: false
+      PIPFILES: Pipfile
     secrets:
        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
