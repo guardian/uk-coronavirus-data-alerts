@@ -1,10 +1,9 @@
-import {App, Arn, CfnParameter, Duration, Fn} from "@aws-cdk/core";
-import {Runtime} from "@aws-cdk/aws-lambda";
-import {Schedule} from "@aws-cdk/aws-events";
-import {PolicyStatement} from "@aws-cdk/aws-iam";
-import type {GuStackProps} from "@guardian/cdk/lib/constructs/core";
-import {GuStack} from "@guardian/cdk/lib/constructs/core";
-import {GuScheduledLambda} from "@guardian/cdk/lib/patterns/scheduled-lambda";
+import {GuScheduledLambda} from "@guardian/cdk";
+import {Runtime} from "aws-cdk-lib/aws-lambda";
+import {App, Arn, CfnParameter, Duration, Fn} from "aws-cdk-lib";
+import {GuStack, GuStackProps} from "@guardian/cdk/lib/constructs/core";
+import {Schedule} from "aws-cdk-lib/aws-events";
+import {PolicyStatement} from "aws-cdk-lib/aws-iam";
 
 function constructLambda(emailType: string, notifyEmailAddresses: CfnParameter, app: string, scope: GuStack) {
     return new GuScheduledLambda(scope, app, {
@@ -69,6 +68,8 @@ class UKCoronavirusDataAlertsStack extends GuStack {
     }
 }
 
-new UKCoronavirusDataAlertsStack(new App(), 'UKCoronavirusDataAlerts', {
-    stack: 'pfi-structured'
-});
+new UKCoronavirusDataAlertsStack(new App(), "UKCoronavirusDataAlerts", {
+        stack: "pfi-structured",
+        stage: "PROD"
+    }
+)

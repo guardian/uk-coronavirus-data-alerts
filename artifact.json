@@ -5,7 +5,7 @@
     "actions": [
         {
             "action": "cloudformation",
-            "path": "dist/cloudformation.yaml",
+            "path": "cdk.out/UKCoronavirusDataAlerts.template.json",
             "compress": false
         },
         {
