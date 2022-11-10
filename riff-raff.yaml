@@ -6,7 +6,7 @@ deployments:
     type: cloud-formation
     app: uk-coronavirus-data-alerts
     parameters:
-      templatePath: cloudformation.yaml
+      templatePath: UKCoronavirusDataAlerts.template.json
       createStackIfAbsent: false
 
   uk-coronavirus-data-alerts-verified:
