@@ -2,7 +2,7 @@
   "name": "uk-coronavirus-data-alerts",
   "version": "0.0.1",
   "dependencies": {
-    "@guardian/node-riffraff-artifact": "^0.2.1",
+    "@guardian/node-riffraff-artifact": "^0.3.2",
     "@tsconfig/node14": "^1.0.0",
     "ts-node": "^9.1.1",
     "typescript": "^4.2.4"
