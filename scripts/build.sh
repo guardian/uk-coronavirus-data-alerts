@@ -1,9 +1,6 @@
 #!/bin/bash
 set -e
 
-export NVM_DIR="$HOME/.nvm"
-[[ -s "$NVM_DIR/nvm.sh" ]] && . "$NVM_DIR/nvm.sh"  # This loads nvm
-
 mkdir -p dist
 
 # Run the build inside Docker as Numpy (via Pandas) will install
@@ -14,8 +11,14 @@ docker run \
     python:3.8-slim \
     scripts/build-deploy-package.sh
 
-nvm use
 npm install
 npm run synth
 
-./node_modules/.bin/node-riffraff-artifact
+BUILD_DIR=$(pwd)/dist/lambda
+CA_VERIFIED_DEST=${BUILD_DIR}/uk-coronavirus-data-alerts-verified.zip
+CA_UNVERIFIED_DEST=${BUILD_DIR}/uk-coronavirus-data-alerts-unverified.zip
+
+zip -r $CA_VERIFIED_DEST $BUILD_DIR
+
+# We use the same zip for both verified/unverified
+cp $CA_VERIFIED_DEST $CA_UNVERIFIED_DEST
