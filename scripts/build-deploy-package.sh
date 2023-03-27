@@ -18,3 +18,4 @@ cp -r $SITE_PACKAGES/* $BUILD_DIR
 echo "Done"
 
 cp -r src/*.py $BUILD_DIR
+

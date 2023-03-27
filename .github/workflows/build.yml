@@ -1,0 +1,39 @@
+jobs:
+  CI:
+    runs-on: ubuntu-latest
+
+    permissions:
+      # Allow GitHub to request an OIDC JWT ID token, for exchange with `aws-actions/configure-aws-credentials`
+      # See https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services#updating-your-github-actions-workflow
+      id-token: write
+
+      # Required for `actions/checkout`
+      contents: read
+
+  steps:
+    - uses: actions/checkout@v3
+
+    - uses: actions/setup-node@v3
+      with:
+        node-version-file: ".nvmrc"
+
+    - run: ./scripts/build.sh
+      shell: bash
+
+    # Exchange OIDC JWT ID token for temporary AWS credentials to allow uploading to S3
+    - uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-region: eu-west-1
+        role-to-assume: ${{ secrets.GU_RIFF_RAFF_ROLE_ARN }}
+
+    - uses: guardian/actions-riff-raff@v2
+      with:
+        projectName: investigations::uk-coronavirus-data-alerts
+        configPath: "riff-raff.yaml"
+        contentDirectories: |
+          cloudformation:
+            - cdk.out/UKCoronavirusDataAlerts.template.json
+          uk-coronavirus-data-alerts-verified:
+            - dist/lambda
+          uk-coronavirus-data-alerts-unverified:
+            - dist/lambda
